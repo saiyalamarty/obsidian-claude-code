@@ -1,7 +1,7 @@
 {
-	"name": "obsidian-sample-plugin",
-	"version": "1.0.0",
-	"description": "This is a sample plugin for Obsidian (https://obsidian.md)",
+	"name": "obsidian-claude-code",
+	"version": "0.1.0",
+	"description": "Claude Code in an Obsidian panel — chat, diffs, tool approvals.",
 	"main": "main.js",
 	"type": "module",
 	"scripts": {
@@ -24,6 +24,7 @@
 		"jiti": "2.6.1"
 	},
 	"dependencies": {
+		"@pierre/diffs": "^1.1.16",
 		"obsidian": "latest"
 	}
 }

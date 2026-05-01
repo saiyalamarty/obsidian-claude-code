@@ -1,99 +1,115 @@
-import {App, Editor, MarkdownView, Modal, Notice, Plugin} from 'obsidian';
-import {DEFAULT_SETTINGS, MyPluginSettings, SampleSettingTab} from "./settings";
+import { Notice, Plugin, WorkspaceLeaf } from "obsidian";
+import {
+	ClaudeCodeSettings,
+	ClaudeCodeSettingTab,
+	DEFAULT_SETTINGS,
+	ViewLocation,
+} from "./settings";
+import { CLAUDE_CODE_VIEW_TYPE, ChatView } from "./view/chat-view";
+import { PermissionServer } from "./claude/permission-server";
+import { setEnabled as setLoggingEnabled } from "./log";
 
-// Remember to rename these classes and interfaces!
+export default class ClaudeCodePlugin extends Plugin {
+	settings!: ClaudeCodeSettings;
+	permissionServer!: PermissionServer;
 
-export default class MyPlugin extends Plugin {
-	settings: MyPluginSettings;
-
-	async onload() {
+	async onload(): Promise<void> {
 		await this.loadSettings();
 
-		// This creates an icon in the left ribbon.
-		this.addRibbonIcon('dice', 'Sample', (evt: MouseEvent) => {
-			// Called when the user clicks the icon.
-			new Notice('This is a notice!');
+		this.permissionServer = new PermissionServer();
+		try {
+			await this.permissionServer.start();
+		} catch (err) {
+			console.error("[claude-code] permission server failed to start", err);
+			new Notice("Claude Code: permission server failed to start; tool approval will not work.");
+		}
+
+		this.registerView(CLAUDE_CODE_VIEW_TYPE, (leaf) => new ChatView(leaf, this));
+
+		this.addRibbonIcon("bot", "Open Claude Code", () => {
+			void this.activateView();
 		});
 
-		// This adds a status bar item to the bottom of the app. Does not work on mobile apps.
-		const statusBarItemEl = this.addStatusBarItem();
-		statusBarItemEl.setText('Status bar text');
-
-		// This adds a simple command that can be triggered anywhere
 		this.addCommand({
-			id: 'open-modal-simple',
-			name: 'Open modal (simple)',
+			id: "open-claude-code",
+			name: "Open Claude Code",
 			callback: () => {
-				new SampleModal(this.app).open();
-			}
+				void this.activateView();
+			},
 		});
-		// This adds an editor command that can perform some operation on the current editor instance
+
 		this.addCommand({
-			id: 'replace-selected',
-			name: 'Replace selected content',
-			editorCallback: (editor: Editor, view: MarkdownView) => {
-				editor.replaceSelection('Sample editor command');
-			}
-		});
-		// This adds a complex command that can check whether the current state of the app allows execution of the command
-		this.addCommand({
-			id: 'open-modal-complex',
-			name: 'Open modal (complex)',
-			checkCallback: (checking: boolean) => {
-				// Conditions to check
-				const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
-				if (markdownView) {
-					// If checking is true, we're simply "checking" if the command can be run.
-					// If checking is false, then we want to actually perform the operation.
-					if (!checking) {
-						new SampleModal(this.app).open();
-					}
-
-					// This command will only show up in Command Palette when the check function returns true
-					return true;
-				}
-				return false;
-			}
+			id: "open-claude-code-here",
+			name: "Open Claude Code in current pane",
+			callback: () => {
+				void this.activateView("center");
+			},
 		});
 
-		// This adds a settings tab so the user can configure various aspects of the plugin
-		this.addSettingTab(new SampleSettingTab(this.app, this));
-
-		// If the plugin hooks up any global DOM events (on parts of the app that doesn't belong to this plugin)
-		// Using this function will automatically remove the event listener when this plugin is disabled.
-		this.registerDomEvent(document, 'click', (evt: MouseEvent) => {
-			new Notice("Click");
-		});
-
-		// When registering intervals, this function will automatically clear the interval when the plugin is disabled.
-		this.registerInterval(window.setInterval(() => console.log('setInterval'), 5 * 60 * 1000));
-
+		this.addSettingTab(new ClaudeCodeSettingTab(this.app, this));
 	}
 
-	onunload() {
+	onunload(): void {
+		this.permissionServer?.stop();
 	}
 
-	async loadSettings() {
-		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData() as Partial<MyPluginSettings>);
+	async loadSettings(): Promise<void> {
+		this.settings = Object.assign(
+			{},
+			DEFAULT_SETTINGS,
+			(await this.loadData()) as Partial<ClaudeCodeSettings>,
+		);
+		if (this.settings.permissionMode !== "default") {
+			this.settings.permissionMode = "default";
+		}
+		setLoggingEnabled(this.settings.debugLogging);
 	}
 
-	async saveSettings() {
+	async saveSettings(): Promise<void> {
 		await this.saveData(this.settings);
-	}
-}
-
-class SampleModal extends Modal {
-	constructor(app: App) {
-		super(app);
+		setLoggingEnabled(this.settings.debugLogging);
 	}
 
-	onOpen() {
-		let {contentEl} = this;
-		contentEl.setText('Woah!');
+	getWorkingDirectory(): string | null {
+		if (this.settings.workingDirectory === "custom") {
+			return this.settings.customWorkingDirectory || null;
+		}
+		const adapter = this.app.vault.adapter as {
+			basePath?: string;
+			getBasePath?: () => string;
+		};
+		if (typeof adapter.getBasePath === "function") return adapter.getBasePath();
+		if (typeof adapter.basePath === "string") return adapter.basePath;
+		return null;
 	}
 
-	onClose() {
-		const {contentEl} = this;
-		contentEl.empty();
+	async activateView(locationOverride?: ViewLocation): Promise<void> {
+		const location = locationOverride ?? this.settings.viewLocation;
+		const existing = this.app.workspace.getLeavesOfType(CLAUDE_CODE_VIEW_TYPE)[0];
+
+		let leaf: WorkspaceLeaf | null;
+		if (existing) {
+			leaf = existing;
+		} else {
+			leaf = this.leafForLocation(location);
+			if (!leaf) {
+				new Notice(`Claude Code: could not open ${location} leaf.`);
+				return;
+			}
+			await leaf.setViewState({ type: CLAUDE_CODE_VIEW_TYPE, active: true });
+		}
+		this.app.workspace.revealLeaf(leaf);
+	}
+
+	private leafForLocation(location: ViewLocation): WorkspaceLeaf | null {
+		switch (location) {
+			case "right":
+				return this.app.workspace.getRightLeaf(false);
+			case "left":
+				return this.app.workspace.getLeftLeaf(false);
+			case "center":
+			default:
+				return this.app.workspace.getLeaf("tab");
+		}
 	}
 }
