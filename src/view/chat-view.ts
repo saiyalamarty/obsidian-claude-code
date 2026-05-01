@@ -109,7 +109,7 @@ export class ChatView extends ItemView {
 				"aria-multiline": "true",
 				"data-placeholder": "Ask Claude…  (paste, drop or attach images, @ for files, / for commands)",
 			},
-		}) as HTMLDivElement;
+		});
 
 		this.fileInputEl = this.composerCardEl.createEl("input", {
 			attr: {
@@ -360,7 +360,7 @@ export class ChatView extends ItemView {
 		this.typingEl?.remove();
 		this.typingEl = null;
 		this.scrollEl.empty();
-		this.setTitle("Claude Code");
+		this.setTitle("Claude code");
 		this.clearComposer();
 		this.setStatus("", false);
 		this.refreshDropdowns();
@@ -403,7 +403,9 @@ export class ChatView extends ItemView {
 				text: title ?? s.preview,
 			});
 			row.createDiv({ cls: "claude-code-recent-meta", text: relativeTime(s.mtimeMs) });
-			row.addEventListener("click", () => this.resumeSession(s, title ?? null));
+			row.addEventListener("click", () => {
+				void this.resumeSession(s, title ?? null);
+			});
 		});
 	}
 
@@ -468,7 +470,7 @@ export class ChatView extends ItemView {
 		if (this.session) return this.session;
 		const cwd = this.plugin.getWorkingDirectory();
 		if (!cwd) {
-			new Notice("Claude Code: no working directory resolved.");
+			new Notice("No working directory resolved.");
 			throw new Error("no working directory");
 		}
 		const session = new Session({
@@ -990,25 +992,27 @@ export class ChatView extends ItemView {
 				attr: { "aria-label": "Copy message" },
 			});
 			setIcon(btn, "copy");
-			btn.addEventListener("click", async (e) => {
+			btn.addEventListener("click", (e) => {
 				e.stopPropagation();
 				const text = m.blocks
 					.filter((b) => b.type === "text")
 					.map((b) => (b.type === "text" ? b.text : ""))
 					.join("\n\n");
-				try {
-					await navigator.clipboard.writeText(text);
-					btn.empty();
-					setIcon(btn, "check");
-					btn.addClass("is-copied");
-					window.setTimeout(() => {
+				void (async () => {
+					try {
+						await navigator.clipboard.writeText(text);
 						btn.empty();
-						setIcon(btn, "copy");
-						btn.removeClass("is-copied");
-					}, 1200);
-				} catch (err) {
-					console.error("[claude-code] clipboard write failed", err);
-				}
+						setIcon(btn, "check");
+						btn.addClass("is-copied");
+						window.setTimeout(() => {
+							btn.empty();
+							setIcon(btn, "copy");
+							btn.removeClass("is-copied");
+						}, 1200);
+					} catch (err) {
+						console.error("[claude-code] clipboard write failed", err);
+					}
+				})();
 			});
 		}
 	}
@@ -1047,7 +1051,7 @@ export class ChatView extends ItemView {
 		}
 		if (block.type === "thinking") {
 			const det = host.createEl("details", { cls: "claude-code-thinking" });
-			det.createEl("summary", { text: "thinking" });
+			det.createEl("summary", { text: "Thinking" });
 			det.createEl("pre", { text: block.thinking });
 			return;
 		}
@@ -1221,7 +1225,7 @@ function exportToolMeta(block: { name: string; input: Record<string, unknown> })
 	title: string;
 } {
 	const fileBase = (p: unknown): string => {
-		const s = String(p ?? "");
+		const s = typeof p === "string" ? p : "";
 		const i = s.lastIndexOf("/");
 		return i >= 0 ? s.slice(i + 1) : s;
 	};
@@ -1299,7 +1303,7 @@ function blobToBase64(blob: Blob): Promise<string> {
 			const idx = result.indexOf(",");
 			resolve(idx >= 0 ? result.slice(idx + 1) : result);
 		};
-		reader.onerror = () => reject(reader.error);
+		reader.onerror = () => reject(reader.error ?? new Error("FileReader error"));
 		reader.readAsDataURL(blob);
 	});
 }

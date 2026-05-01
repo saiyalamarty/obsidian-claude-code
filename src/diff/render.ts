@@ -121,7 +121,6 @@ export async function renderDiff(
 		const cs = { value: false };
 		try {
 			// Forward-declared so the closure below can reference it.
-			// eslint-disable-next-line prefer-const
 			let fileDiff: FileDiff;
 			const toggleCollapse = () => {
 				cs.value = !cs.value;
@@ -149,7 +148,7 @@ export async function renderDiff(
 			console.error("[git-diffs] FileDiff.render failed", err);
 			const pre = document.createElement("pre");
 			pre.textContent = `render error: ${err instanceof Error ? err.stack ?? err.message : String(err)}`;
-			pre.style.color = "#f55";
+			pre.classList.add("git-diffs-render-error");
 			host.appendChild(pre);
 			return null;
 		}
@@ -168,22 +167,24 @@ export async function renderDiff(
 				text: "Load diff",
 				cls: "git-diffs-placeholder-btn",
 			});
-			btn.addEventListener("click", async () => {
-				btn.disabled = true;
-				btn.textContent = "Loading…";
-				try {
-					const { oldFile, newFile } = await options.loadLargeFile(spec);
-					const host = document.createElement(DIFFS_TAG_NAME);
-					placeholder.replaceWith(host);
-					mountFileDiff(host, oldFile, newFile, spec.name);
-				} catch (err) {
-					btn.disabled = false;
-					btn.textContent = "Load diff";
-					placeholder.createEl("pre", {
-						text: `Load failed: ${err instanceof Error ? err.message : String(err)}`,
-						cls: "git-diffs-placeholder-err",
-					});
-				}
+			btn.addEventListener("click", () => {
+				void (async () => {
+					btn.disabled = true;
+					btn.textContent = "Loading…";
+					try {
+						const { oldFile, newFile } = await options.loadLargeFile(spec);
+						const host = document.createElement(DIFFS_TAG_NAME);
+						placeholder.replaceWith(host);
+						mountFileDiff(host, oldFile, newFile, spec.name);
+					} catch (err) {
+						btn.disabled = false;
+						btn.textContent = "Load diff";
+						placeholder.createEl("pre", {
+							text: `Load failed: ${err instanceof Error ? err.message : String(err)}`,
+							cls: "git-diffs-placeholder-err",
+						});
+					}
+				})();
 			});
 			continue;
 		}

@@ -41,7 +41,7 @@ export interface AssistantMessage {
 
 export interface ResultMessage {
 	type: "result";
-	subtype?: "success" | "error_max_turns" | "error_during_execution" | string;
+	subtype?: string;
 	duration_ms?: number;
 	num_turns?: number;
 	session_id?: string;

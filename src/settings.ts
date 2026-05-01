@@ -67,10 +67,9 @@ export class ClaudeCodeSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl)
 			.setName("Claude binary path")
-			.setDesc("Path to the claude executable. Use just 'claude' if it's on PATH.")
+			.setDesc("Path to the claude executable. Use just 'claude' if it's on path.")
 			.addText((text) =>
 				text
-					.setPlaceholder("claude")
 					.setValue(this.plugin.settings.claudeBinaryPath)
 					.onChange(async (value) => {
 						this.plugin.settings.claudeBinaryPath = value.trim() || "claude";
@@ -96,10 +95,10 @@ export class ClaudeCodeSettingTab extends PluginSettingTab {
 		if (this.plugin.settings.workingDirectory === "custom") {
 			new Setting(containerEl)
 				.setName("Custom working directory")
-				.setDesc("Absolute path used when 'Custom path' is selected.")
+				.setDesc("Absolute path used when 'custom path' is selected.")
 				.addText((text) =>
 					text
-						.setPlaceholder("/Users/you/code/project")
+						.setPlaceholder("/path/to/project")
 						.setValue(this.plugin.settings.customWorkingDirectory)
 						.onChange(async (value) => {
 							this.plugin.settings.customWorkingDirectory = value.trim();
@@ -111,7 +110,7 @@ export class ClaudeCodeSettingTab extends PluginSettingTab {
 		new Setting(containerEl)
 			.setName("Permission mode")
 			.setDesc(
-				"Locked to Default while the in-panel approval UI is being built. Other modes will be enabled once the gate ships.",
+				"Locked to default while the in-panel approval UI is being built. Other modes will be enabled once the gate ships.",
 			)
 			.addDropdown((dd) => {
 				dd.addOption("default", "Default (prompt per tool)")
@@ -132,7 +131,7 @@ export class ClaudeCodeSettingTab extends PluginSettingTab {
 			.setDesc("Used as the per-chat default. Leave blank to inherit from claude config.")
 			.addText((text) =>
 				text
-					.setPlaceholder("opus, sonnet, haiku, or claude-opus-4-7")
+					.setPlaceholder("Opus, sonnet, haiku, or claude-opus-4-7")
 					.setValue(this.plugin.settings.defaultModel)
 					.onChange(async (value) => {
 						this.plugin.settings.defaultModel = value.trim();
@@ -158,9 +157,8 @@ export class ClaudeCodeSettingTab extends PluginSettingTab {
 		if (cwd) {
 			void loadClaudeFileDefaults(cwd).then((claudeDefaults) => {
 				if (claudeDefaults.model) {
-					const input = modelTextSetting.controlEl.querySelector(
-						"input",
-					) as HTMLInputElement | null;
+					const input =
+						modelTextSetting.controlEl.querySelector<HTMLInputElement>("input");
 					if (input) {
 						input.placeholder = `inherit from claude config: ${claudeDefaults.model}`;
 					}

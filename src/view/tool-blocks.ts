@@ -4,6 +4,14 @@ import { renderDiff, type FileRenderSpec } from "../diff/render";
 import type { ToolUseBlock, ToolResultBlock } from "../claude/types";
 import type { ClaudeCodeSettings } from "../settings";
 
+function asString(v: unknown, fallback = ""): string {
+	return typeof v === "string" ? v : fallback;
+}
+
+function asNumber(v: unknown, fallback = 0): number {
+	return typeof v === "number" ? v : fallback;
+}
+
 export type ApprovalState =
 	| { kind: "none" }
 	| { kind: "pending" }
@@ -121,7 +129,7 @@ async function mountCallout(
 	const fold = opts.collapsible ? (opts.collapsedByDefault ? "-" : "+") : "";
 	const safeTitle = opts.title.replace(/\r?\n/g, " ").trim();
 	// Include a placeholder body line so MarkdownRenderer creates a `.callout-content` div.
-	const md = `> [!${opts.type}]${fold} ${safeTitle}\n> ​`;
+	const md = `> [!${opts.type}]${fold} ${safeTitle}\n> \u200B`;
 
 	const scratch = createDiv();
 	try {
@@ -134,7 +142,7 @@ async function mountCallout(
 
 	if (!wrap.isConnected) return;
 
-	const callout = scratch.querySelector(".callout") as HTMLElement | null;
+	const callout = scratch.querySelector<HTMLElement>(".callout");
 	if (!callout) {
 		wrap.appendChild(scratch);
 		return;
@@ -162,7 +170,7 @@ async function mountCallout(
 		}
 	}
 
-	let content = callout.querySelector(".callout-content") as HTMLElement | null;
+	let content = callout.querySelector<HTMLElement>(".callout-content");
 	if (!content) {
 		content = callout.createDiv({ cls: "callout-content" });
 	}
@@ -196,11 +204,11 @@ function toolMetadata(block: ToolUseBlock): ToolMeta {
 	});
 	switch (block.name) {
 		case "Edit":
-			return make("edit", `Edit · ${basename(String(block.input.file_path ?? ""))}`);
+			return make("edit", `Edit · ${basename(asString(block.input.file_path))}`);
 		case "Write":
-			return make("write", `Write · ${basename(String(block.input.file_path ?? ""))}`);
+			return make("write", `Write · ${basename(asString(block.input.file_path))}`);
 		case "Read":
-			return make("read", `Read · ${basename(String(block.input.file_path ?? ""))}`);
+			return make("read", `Read · ${basename(asString(block.input.file_path))}`);
 		case "Bash":
 			return make("bash", "Bash");
 		case "BashOutput":
@@ -224,7 +232,7 @@ function toolMetadata(block: ToolUseBlock): ToolMeta {
 		case "AskUserQuestion":
 			return make("generic", "Ask user");
 		case "SlashCommand":
-			return make("generic", `Slash: ${String(block.input.command ?? "")}`);
+			return make("generic", `Slash: ${asString(block.input.command)}`);
 	}
 	if (block.name.startsWith("mcp__")) {
 		return make("mcp", prettyMcpName(block.name));
@@ -289,9 +297,9 @@ function renderApprovalControls(
 // ---- block-specific renderers ----
 
 function renderEditDiff(host: HTMLElement, block: ToolUseBlock, ctx: ToolBlockContext): void {
-	const filePath = String(block.input.file_path ?? "");
-	const oldString = String(block.input.old_string ?? "");
-	const newString = String(block.input.new_string ?? "");
+	const filePath = asString(block.input.file_path);
+	const oldString = asString(block.input.old_string);
+	const newString = asString(block.input.new_string);
 
 	renderFilePath(host, ctx, filePath);
 	const diffHost = host.createDiv({ cls: "claude-code-diff-host" });
@@ -304,8 +312,8 @@ function renderEditDiff(host: HTMLElement, block: ToolUseBlock, ctx: ToolBlockCo
 }
 
 function renderWriteDiff(host: HTMLElement, block: ToolUseBlock, ctx: ToolBlockContext): void {
-	const filePath = String(block.input.file_path ?? "");
-	const content = String(block.input.content ?? "");
+	const filePath = asString(block.input.file_path);
+	const content = asString(block.input.content);
 
 	renderFilePath(host, ctx, filePath);
 	const diffHost = host.createDiv({ cls: "claude-code-diff-host" });
@@ -318,12 +326,12 @@ function renderWriteDiff(host: HTMLElement, block: ToolUseBlock, ctx: ToolBlockC
 }
 
 function renderReadBlock(host: HTMLElement, block: ToolUseBlock, ctx: ToolBlockContext): void {
-	const filePath = String(block.input.file_path ?? "");
+	const filePath = asString(block.input.file_path);
 	const offset = block.input.offset;
 	const limit = block.input.limit;
 	const range =
 		offset !== undefined || limit !== undefined
-			? ` (offset ${offset ?? 0}${limit !== undefined ? `, limit ${limit}` : ""})`
+			? ` (offset ${asNumber(offset)}${limit !== undefined ? `, limit ${asNumber(limit)}` : ""})`
 			: "";
 	renderFilePath(host, ctx, filePath, range);
 }
@@ -367,8 +375,8 @@ async function openPathInVault(ctx: ToolBlockContext, filePath: string): Promise
 }
 
 function renderBashBlock(host: HTMLElement, block: ToolUseBlock): void {
-	const command = String(block.input.command ?? "");
-	const description = block.input.description ? String(block.input.description) : "";
+	const command = asString(block.input.command);
+	const description = asString(block.input.description);
 	if (description) {
 		host.createDiv({ cls: "claude-code-tool-desc", text: description });
 	}
@@ -380,9 +388,13 @@ function renderBashBlock(host: HTMLElement, block: ToolUseBlock): void {
 }
 
 function renderSearchBlock(host: HTMLElement, block: ToolUseBlock): void {
-	const pattern = String(block.input.pattern ?? block.input.query ?? block.input.url ?? "");
-	const path = block.input.path ? ` in ${block.input.path}` : "";
-	host.createDiv({ cls: "claude-code-tool-query", text: `${pattern}${path}` });
+	const pattern =
+		asString(block.input.pattern) ||
+		asString(block.input.query) ||
+		asString(block.input.url);
+	const path = asString(block.input.path);
+	const suffix = path ? ` in ${path}` : "";
+	host.createDiv({ cls: "claude-code-tool-query", text: `${pattern}${suffix}` });
 }
 
 function renderTodoBlock(host: HTMLElement, block: ToolUseBlock): void {
@@ -401,13 +413,15 @@ function renderTodoBlock(host: HTMLElement, block: ToolUseBlock): void {
 }
 
 function renderTaskBlock(host: HTMLElement, block: ToolUseBlock): void {
-	const description = String(block.input.description ?? "");
-	const subagent = block.input.subagent_type ? ` (${String(block.input.subagent_type)})` : "";
+	const description = asString(block.input.description);
+	const subagentType = asString(block.input.subagent_type);
+	const subagent = subagentType ? ` (${subagentType})` : "";
 	host.createDiv({ cls: "claude-code-tool-desc", text: `${description}${subagent}` });
-	if (block.input.prompt) {
+	const prompt = asString(block.input.prompt);
+	if (prompt) {
 		host.createEl("pre", {
 			cls: "claude-code-tool-json",
-			text: String(block.input.prompt),
+			text: prompt,
 		});
 	}
 }

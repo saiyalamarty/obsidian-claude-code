@@ -21,26 +21,26 @@ export default class ClaudeCodePlugin extends Plugin {
 			await this.permissionServer.start();
 		} catch (err) {
 			console.error("[claude-code] permission server failed to start", err);
-			new Notice("Claude Code: permission server failed to start; tool approval will not work.");
+			new Notice("Permission server failed to start; tool approval will not work.");
 		}
 
 		this.registerView(CLAUDE_CODE_VIEW_TYPE, (leaf) => new ChatView(leaf, this));
 
-		this.addRibbonIcon("bot", "Open Claude Code", () => {
+		this.addRibbonIcon("bot", "Open chat", () => {
 			void this.activateView();
 		});
 
 		this.addCommand({
-			id: "open-claude-code",
-			name: "Open Claude Code",
+			id: "open",
+			name: "Open chat",
 			callback: () => {
 				void this.activateView();
 			},
 		});
 
 		this.addCommand({
-			id: "open-claude-code-here",
-			name: "Open Claude Code in current pane",
+			id: "open-here",
+			name: "Open chat in current pane",
 			callback: () => {
 				void this.activateView("center");
 			},
@@ -98,7 +98,7 @@ export default class ClaudeCodePlugin extends Plugin {
 			}
 			await leaf.setViewState({ type: CLAUDE_CODE_VIEW_TYPE, active: true });
 		}
-		this.app.workspace.revealLeaf(leaf);
+		void this.app.workspace.revealLeaf(leaf);
 	}
 
 	private leafForLocation(location: ViewLocation): WorkspaceLeaf | null {

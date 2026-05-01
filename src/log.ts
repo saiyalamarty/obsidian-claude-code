@@ -9,5 +9,5 @@ export function setEnabled(value: boolean): void {
 
 export function log(...args: unknown[]): void {
 	if (!enabled) return;
-	console.log(...args);
+	console.debug(...args);
 }

@@ -125,7 +125,7 @@ export async function loadSessionTranscript(
 			message?: { role?: "user" | "assistant"; content?: unknown };
 		};
 		try {
-			parsed = JSON.parse(line);
+			parsed = JSON.parse(line) as typeof parsed;
 		} catch {
 			continue;
 		}
@@ -189,7 +189,7 @@ function normalizeContent(content: unknown): ContentBlock[] {
 				typeof src.data === "string"
 			) {
 				out.push({
-					type: t as "image" | "document",
+					type: t,
 					source: {
 						type: "base64",
 						media_type: src.media_type,
